@@ -94,12 +94,14 @@ class BALL(pygame.sprite.Sprite):
         self.x=x        
         self.velx=velx
         self.vely=vely
+
         self.mass=mass
         self.radius=10+self.mass
         self.radius=10
         self.origcolor=color
         self.color=color
         self.pos=(self.x,self.y)
+        self.old_pos=(0,0)
         self.wave=wave
         self.origwave=wave
         self.freq=freq
@@ -126,29 +128,32 @@ class BALL(pygame.sprite.Sprite):
         self.adx+=self.velx
         self.pos=(int(self.x+self.adx),int(self.y+self.ady))
         
-    '''def return_coord(self):
-        return self.pos[0],self.pos[1]'''
     
-    def return_coord_tuple(self):
+    def return_coord(self):
         return (self.pos[0],self.pos[1])
         
     
     def return_vel(self):
         return (self.velx,self.vely)
-    
+
             
     def collide_vel(self,x,y):
         self.velx=x
         self.vely=y
         
+    def update_pos(self,x,y):
+        self.pos=(int(x),int(y))
+        
+        
     def update(self):
+
         self.reflect_edge()
         r1=math.sqrt(((self.pos[0]-600)**2)+((self.pos[1]-400)**2))
         self.position()
         r2=math.sqrt(((self.pos[0]-600)**2)+((self.pos[1]-400)**2))
-        #print(int(self.wave),int(self.r1),int(self.dwave))
+
         dwave=r1*self.wave*math.pow(10,-3)
-        #print(r2-r1)
+
         if(r2-r1==0):
             pass
         elif(r2-r1>0):
@@ -167,36 +172,128 @@ class BALL(pygame.sprite.Sprite):
         pygame.draw.circle(screen,self.color, self.pos, self.radius)
         pygame.draw.circle(screen,self.origcolor, self.pos, self.radius+2,2)
         pygame.draw.aaline(screen,WHITE,observer,self.pos,1)
-        #print(self.velx,self.vely,self.pos)
         self.wave=self.origwave
 
-def check_col(ball1,ball2,i,j,ball):
+def check_col(ball1,ball2):
     radius=math.sqrt(((ball1[0]-ball2[0])**2)+((ball1[1]-ball2[1])**2))
     if radius<=20:
         return True
     else:
         return False
-                                
-def collisions2(ball_list,ball):
-    val=list(ball_list.values())
-    #print(val)
+
+    
+    
+def col_fix(col_list,ball):
+    col_coords=[]
+    accuracy=0.001
+    for i in range(len(col_list)):
+        ball1=list(ball[col_list[i][0]].return_coord())
+        ball2=list(ball[col_list[i][1]].return_coord())
+        ball1_vel=ball[col_list[i][0]].return_vel()
+        ball2_vel=ball[col_list[i][1]].return_vel()
+        
+        if(ball1_vel[0]==0):
+            ball1_ratio=ball1_vel[1]
+        else:
+            ball1_ratio=ball1_vel[1]/ball1_vel[0]
+            
+        if(ball2_vel[0]==0):
+            ball2_ratio=ball2_vel[1]
+        else:
+            ball2_ratio=ball2_vel[1]/ball2_vel[0]
+        
+
+        radius=math.sqrt(((ball1[0]-ball2[0])**2)+((ball1[1]-ball2[1])**2))
+
+        
+        
+        while(radius<20):
+            if(ball1_vel[0]>0):
+                ball1[0]=ball1[0]-accuracy
+            elif(ball1_vel[0]<0):
+                ball1[0]=ball1[0]+accuracy
+                
+            if(ball2_vel[0]>0):
+                ball2[0]=ball2[0]-accuracy
+            elif(ball2_vel[0]<0):
+                ball2[0]=ball2[0]+accuracy
+                
+            if(ball1_vel[1]>0):
+                ball1[1]=ball1[1]+(ball1_ratio*accuracy)
+            elif(ball1_vel[1]<0):
+                ball1[1]=ball1[1]-(ball1_ratio*accuracy)
+                
+            if(ball2_vel[1]>0):
+                ball2[1]=ball2[1]+(ball2_ratio*accuracy)
+            elif(ball2_vel[1]<0):
+                ball2[1]=ball2[1]-(ball2_ratio*accuracy)
+                
+            radius=math.sqrt(((int(ball1[0])-int(ball2[0]))**2)+((int(ball1[1])-int(ball2[1]))**2))
+
+            
+        ball[col_list[i][0]].update_pos(ball1[0],ball1[1])
+        ball[col_list[i][1]].update_pos(ball2[0],ball2[1])
+        col_coords.append(((int(ball1[0]),int(ball1[1])),(int(ball2[0]),int(ball2[1]))))
+        #r=math.sqrt(((int(ball1[0])-int(ball2[0]))**2)+((int(ball1[1])-int(ball2[1]))**2))
+        print(radius)
+
+    return col_coords
+            
+            
+def distance(coord,ball):
+    ball1=list(ball[coord[0]].return_coord())
+    ball2=list(ball[coord[1]].return_coord())
+    radius=math.sqrt(((ball1[0]-ball2[0])**2)+((ball1[1]-ball2[1])**2))
+    return radius
+    
+
+def find_b(xi,yi,xvel,yvel,xj,yj):
+    
+    if(yvel>0):
+            
+        mi=((yi-abs(yvel))-yi)/((xi+xvel)-xi)
+        mj=((yj-abs(yvel))-yj)/((xj+xvel)-xj)
+            
+    elif(yvel<0):
+            
+        mi=((yi+abs(yvel))-yi)/((xi+xvel)-xi)
+        mj=((yj+abs(yvel))-yj)/((xj+xvel)-xj)
+        
+    else:
+        
+        mi=0
+        mj=0
+        
+                    
+    ci=yi-(mi*xi)
+    cj=yj-(mj*xj)
+    a=mi
+    #print("slopes",mi,mj)
+    b=-1
+    d=abs(ci-cj)/(math.sqrt((a**2)+(b**2)))
+    return d
+
+    
+def collisions_manual(ball_list,ball): 
+    
+    ball_list_dup=ball_list
     collide=[]
-    for i in range(len(val)):
-        for j in range(len(val)):
-            if(i!=j and check_col(val[i],val[j],i,j,ball)==True):
-                if(val[i][0]<=val[j][0]):  
-                    collide.append((i,j))
+    
+    for ballno,coordinate in ball_list.items():
+        for ballno2,coordinate2 in ball_list_dup.items():
+            if(ballno!=ballno2 and check_col(coordinate,coordinate2)==True):
+                if(coordinate[0]<=coordinate2[0]):
+                    collide.append((ballno,ballno2))
                 else:
-                    collide.append((j,i))
+                    collide.append((ballno2,ballno))
+                    
     collide=list(set(collide))
-    #print(collide)
+    
+    collide_coords=col_fix(collide,ball)
+
+    
     for i in range(len(collide)):
         
-            
-        theta=math.degrees(math.asin(math.sqrt(1-math.pow(abs(val[collide[i][0]][1]-val[collide[i][1]][1])/20,2))))
-        phi=math.degrees(math.asin(abs(val[collide[i][0]][1]-val[collide[i][1]][1])/20))
-            
-        point=((val[collide[i][0]][0]+val[collide[i][1]][0])/2,(val[collide[i][0]][1]+val[collide[i][1]][1])/2)    
         viox=ball[collide[i][0]].return_vel()[0]
         vioy=ball[collide[i][0]].return_vel()[1]
         vjox=ball[collide[i][1]].return_vel()[0]
@@ -205,36 +302,120 @@ def collisions2(ball_list,ball):
         vioy+=vjoy
         vjoy=0
         vjox=0
-            
-        if(point[1]<val[collide[i][1]][1]):
-            theta=-theta
-        elif(point[1]>val[collide[i][1]][1]):
-            phi=-phi
-            
-            
-        vj=(vioy-(viox*math.tan(math.radians(theta))))/(math.sin(math.radians(phi))-(math.cos(math.radians(phi))*math.tan(math.radians(theta))))    
-        vi=(viox-(vj*math.cos(math.radians(phi))))/math.cos(math.radians(theta))
-        vinx=vi*math.cos(math.radians(theta))
-        viny=vi*math.sin(math.radians(theta))
-        vjnx=vj*math.cos(math.radians(phi))
-        vjny=vj*math.sin(math.radians(phi))
+        D=20
+        rev=False
+
+
+        b=find_b(collide_coords[i][0][0],collide_coords[i][0][1],viox,vioy,collide_coords[i][1][0],collide_coords[i][1][1])
+        #print(b)
             
             
-        ball[collide[i][0]].collide_vel(vjnx,vjny)
-        ball[collide[i][1]].collide_vel(vinx,viny)
-        print(theta,phi,viox,vioy,vi,vj,vinx,viny,vjnx,vjny)
+        #print("b:",b)
+        if(int(b)>=20):
+            theta=0
+            phi=0
+            print("here")
+                       
+        elif(viox>0):
+            theta=round(math.degrees(math.asin(math.sqrt(1-math.pow(b/D,2)))),4)
+            phi=round(math.degrees(math.asin(b/D)),4)
+           
+        else:
+            rev=True
+            theta=round(180-math.degrees(math.asin(math.sqrt(1-math.pow(b/D,2)))),4)
+            phi=round(180-math.degrees(math.asin(b/D)),4)
             
+
+               
+        if(theta!=0 and phi!=0):    
+            #shift=round(math.degrees(math.atan2(vioy,viox)),4)
+            #radii=round(-(math.degrees(math.atan2(collide_coords[i][1][1]-collide_coords[i][0][1],collide_coords[i][1][0]-collide_coords[i][0][0]))),4)
+            #print("shift and radii",shift,radii)
+            #print("angles before",theta,phi)
+            
+            if(rev==False):
+                
+                shift=round(math.degrees(math.atan2(vioy,viox)),4)
+                radii=round(-(math.degrees(math.atan2(collide_coords[i][1][1]-collide_coords[i][0][1],collide_coords[i][1][0]-collide_coords[i][0][0]))),4)
+                print("x positive shift and radii",shift,radii)
+                print("angles before",theta,phi)
+                
+                if(shift>radii):
+                    #theta=theta+shift
+                    theta=radii+90
+                    #phi=shift-phi
+                    phi=radii
+                elif(shift<radii):
+                    #theta=shift-theta
+                    theta=radii-90
+                    phi=radii
+                    #phi=phi+shift
+            else:
+                
+                shift=round(math.degrees(math.atan2(vioy,viox)),4)
+                radii=round(-(math.degrees(math.atan2(collide_coords[i][0][1]-collide_coords[i][1][1],collide_coords[i][0][0]-collide_coords[i][1][0]))),4)
+                print("x negative shift and radii",shift,radii)
+                print("angles before",theta,phi)
+                
+                if(shift>radii):
+                    #theta=theta+shift
+                    theta=radii
+                    #phi=shift-phi
+                    phi=radii+90
+                elif(shift<radii):
+                    #theta=shift-theta
+                    theta=radii
+                    #phi=phi+shift
+                    phi=radii-90
+                    
+                #temp=theta
+                #theta=phi
+                #phi=temp
+                
+                
+            theta=round(theta,4)
+            phi=round(phi,4)
+            print("angles after",theta,phi)
+
+                
+            vj=(vioy-(viox*math.tan(math.radians(theta))))/(math.sin(math.radians(phi))-(math.cos(math.radians(phi))*math.tan(math.radians(theta))))    
+            vi=(viox-(vj*math.cos(math.radians(phi))))/math.cos(math.radians(theta))
+            vinx=vi*math.cos(math.radians(theta))
+            viny=vi*math.sin(math.radians(theta))
+            vjnx=vj*math.cos(math.radians(phi))
+            vjny=vj*math.sin(math.radians(phi))
+                
+        else:
+            vinx=0
+            viny=0
+            vjny=vioy
+            vjnx=viox
+            #print("perfect collison")
+            
+            
+        ball[collide[i][0]].collide_vel(vinx,viny)
+        ball[collide[i][1]].collide_vel(vjnx,vjny)
+           
+            
+                
+       #print("i:",vinx,viny,"j:",vjnx,vjny)
+       
+        
+           
 pygame.init()
 screen = pygame.display.set_mode((width, height))
-pygame.display.set_caption("SIMULATION")
+pygame.display.set_caption("PARTICLE PHYSICS SIMULATION")
 clock = pygame.time.Clock()
 
 c=3*(10**8)
-
+end=False
 drawing=0
 tick=30
 ball=[]
 ball_locations={}
+leave_alone=[]
+
+
 while running:
         clock.tick(tick)
         screen.fill(BLACK)
@@ -242,7 +423,9 @@ while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running=False
+                end=True
                 pygame.quit()
+                break
                 
                 
             elif event.type == pygame.MOUSEBUTTONDOWN:
@@ -262,6 +445,7 @@ while running:
                     velocitym=(math.sqrt(((x1-x2)**2)+((y1-y2)**2)))/50
                     velocityx=velocitym*math.cos(math.radians(180-math.degrees(math.atan2((y2-y1),(x1-x2)))))
                     velocityy=velocitym*math.sin(math.radians(180-math.degrees(math.atan2((y2-y1),(x1-x2)))))
+                    #print(velocityx,velocityy)
                     #color=(random.randint(0,255),random.randint(0,255),random.randint(0,255))
                     hue=rgb_to_hsv(255, 255, 255)
                     wave=750 - 250 / 270 * hue
@@ -280,6 +464,9 @@ while running:
                         tick=120
                     else:
                         tick+=1
+                        
+        if(end==True):
+             break
                     
          
         if(drawing>0):
@@ -290,16 +477,15 @@ while running:
         loc_cnt=0
             
         for i in ball:
-            ball_locations[loc_cnt]=i.return_coord_tuple()
+            ball_locations[loc_cnt]=i.return_coord()
             loc_cnt+=1
             
-        collisions2(ball_locations,ball)
-                       
+        collisions_manual(ball_locations,ball)
+            
         for i in ball:
             i.update()
-            
-        
+                    
         pygame.display.update()
-        
-pygame.quit()
+         
+
 
